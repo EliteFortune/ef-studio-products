@@ -1,25 +1,69 @@
 import { MissionStatus, CriterionStatus } from '../../core/src/contracts.js';
-import { verifyFileExists, verifyTextContains, verifyCommand } from './verifiers.js';
+import {
+  verifyFileExists,
+  verifyTextContains,
+  verifyCommand,
+  verifyGitBranch,
+  verifyGitClean,
+  verifyGitCommit,
+  verifyGitChangedFile
+} from './verifiers.js';
 
-const handlers = { fileExists: verifyFileExists, textContains: verifyTextContains, command: verifyCommand };
+const handlers = {
+  fileExists: verifyFileExists,
+  textContains: verifyTextContains,
+  command: verifyCommand,
+  gitBranch: verifyGitBranch,
+  gitClean: verifyGitClean,
+  gitCommit: verifyGitCommit,
+  gitChangedFile: verifyGitChangedFile
+};
 
 export function deriveMissionVerdict(results) {
   if (results.length === 0) return MissionStatus.UNKNOWN;
-  if (results.some(r => r.status === CriterionStatus.FAIL)) return MissionStatus.FAILED;
-  if (results.some(r => r.status === CriterionStatus.UNKNOWN)) return MissionStatus.INCOMPLETE;
-  if (results.every(r => r.status === CriterionStatus.PASS)) return MissionStatus.VERIFIED;
+  const mandatory = results.filter(r => r.mandatory !== false);
+  if (mandatory.some(r => r.status === CriterionStatus.FAIL)) return MissionStatus.FAILED;
+  if (mandatory.some(r => r.status === CriterionStatus.UNKNOWN)) return MissionStatus.INCOMPLETE;
+  if (mandatory.length && mandatory.every(r => r.status === CriterionStatus.PASS)) return MissionStatus.VERIFIED;
   return MissionStatus.UNKNOWN;
 }
 
 export function verifyMission(mission) {
+  if (!Array.isArray(mission.criteria) || mission.criteria.length === 0) {
+    return { missionId: mission.id, verifiedStatus: MissionStatus.UNKNOWN, criterionResults: [], createdAt: new Date().toISOString() };
+  }
+
   const results = mission.criteria.map(criterion => {
     const handler = handlers[criterion.type];
-    if (!handler) return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [], explanation: `Unsupported criterion type: ${criterion.type}` };
-    try { return handler(mission.repository, criterion); }
-    catch (error) { return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [], explanation: error.message }; }
+    if (!handler) {
+      return {
+        criterionId: criterion.id,
+        mandatory: criterion.mandatory !== false,
+        status: CriterionStatus.UNKNOWN,
+        evidence: [],
+        contradictions: [],
+        missingEvidence: [`Unsupported criterion type: ${criterion.type}`],
+        explanation: `Unsupported criterion type: ${criterion.type}`
+      };
+    }
+    try {
+      return { mandatory: criterion.mandatory !== false, contradictions: [], missingEvidence: [], ...handler(mission.repository, criterion) };
+    } catch (error) {
+      return {
+        criterionId: criterion.id,
+        mandatory: criterion.mandatory !== false,
+        status: CriterionStatus.UNKNOWN,
+        evidence: [],
+        contradictions: [],
+        missingEvidence: [error.message],
+        explanation: error.message
+      };
+    }
   });
+
   return {
     missionId: mission.id,
+    claimedStatus: mission.claimedStatus ?? null,
     verifiedStatus: deriveMissionVerdict(results),
     criterionResults: results,
     createdAt: new Date().toISOString()
