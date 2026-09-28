@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EliteFortune Agent Reliability</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f7fb;--panel:#fff;--text:#171826;--muted:#6f7285;--line:#e7e8ef;--accent:#6d5dfc;--good:#1f9d67;--warn:#d98420}
+@media(prefers-color-scheme:dark){:root{--bg:#0d0e14;--panel:#151722;--text:#f5f6fb;--muted:#a5a8b8;--line:#282b39;--accent:#8a7cff;--good:#55d99b;--warn:#ffb357}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui;background:var(--bg);color:var(--text)}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}.nav{border-right:1px solid var(--line);padding:24px 18px}.brand{font-weight:750;font-size:18px;margin-bottom:30px}.brand small{display:block;color:var(--muted);font-weight:500;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.nav a{display:block;padding:10px 12px;margin:4px 0;border-radius:9px;color:var(--muted);text-decoration:none}.nav a.active{background:var(--panel);color:var(--text)}
+main{padding:34px;max-width:1100px}.top{display:flex;justify-content:space-between;align-items:flex-start}.top h1{margin:0;font-size:27px}.sub{color:var(--muted);margin-top:6px}.pill{padding:7px 10px;border-radius:99px;background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--good);font-weight:650}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:28px 0}.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px}.metric b{font-size:27px;display:block}.metric span{color:var(--muted)}table{width:100%;border-collapse:collapse}.table-card{padding:0;overflow:hidden}th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:12px;font-weight:600}.good{color:var(--good);font-weight:700}.warn{color:var(--warn);font-weight:700}.footer{margin-top:20px;color:var(--muted);font-size:12px}
+@media(max-width:800px){.shell{grid-template-columns:1fr}.nav{display:none}.grid{grid-template-columns:repeat(2,1fr)}main{padding:22px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="nav"><div class="brand">EliteFortune<small>Agent Reliability</small></div><a class="active">Home</a><a>Runs</a><a>Verification</a><a>Integrations</a><a>System Health</a><a>Settings</a></aside>
+  <main>
+    <div class="top"><div><h1>Agent Reliability</h1><div class="sub">Independent verification for AI coding work.</div></div><div id="health" class="pill">Checking system…</div></div>
+    <div class="grid">
+      <div class="card metric"><b>3</b><span>Runs today</span></div>
+      <div class="card metric"><b>2</b><span>Verified</span></div>
+      <div class="card metric"><b>1</b><span>Needs attention</span></div>
+      <div class="card metric"><b>0</b><span>Could not verify</span></div>
+    </div>
+    <div class="card table-card"><table><thead><tr><th>MISSION</th><th>AGENT CLAIM</th><th>EF RESULT</th><th>CHECKS</th></tr></thead><tbody>
+      <tr><td>Fix checkout timeout</td><td>Complete</td><td class="good">Verified</td><td>6 / 6</td></tr>
+      <tr><td>Add Google authentication</td><td>Complete</td><td class="warn">Needs attention</td><td>5 / 6</td></tr>
+      <tr><td>Add regression test</td><td>Complete</td><td class="good">Verified</td><td>4 / 4</td></tr>
+    </tbody></table></div>
+    <div class="footer">Local-first prototype • EliteFortune branding kept intentionally subtle.</div>
+  </main>
+</div>
+<script>
+fetch('/api/health').then(r=>r.json()).then(h=>{const bad=Object.values(h).some(x=>x&&x.status==='ATTENTION');const e=document.getElementById('health');e.textContent=bad?'System needs attention':'System healthy';if(bad)e.style.color='var(--warn)'}).catch(()=>{document.getElementById('health').textContent='Health unavailable'});
+</script>
+</body>
+</html>
