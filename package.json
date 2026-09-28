@@ -1,0 +1,13 @@
+{
+  "name": "ef-studio-products",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "demo": "node apps/cli/src/index.js demo",
+    "verify": "node apps/cli/src/index.js verify",
+    "console": "node apps/desktop/src/server.js"
+  },
+  "engines": { "node": ">=20" }
+}
