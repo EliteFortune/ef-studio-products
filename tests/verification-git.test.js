@@ -17,34 +17,34 @@ function initRepo() {
   return dir;
 }
 
-test('optional failed criterion does not fail mission', () => {
+test('optional failed criterion does not fail mission', async () => {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ef-opt-'));
   fs.writeFileSync(path.join(dir,'required.txt'),'ok');
-  const result=verifyMission({id:'opt',repository:dir,criteria:[
+  const result=await verifyMission({id:'opt',repository:dir,criteria:[
     {id:'required',type:'fileExists',path:'required.txt'},
     {id:'optional',type:'fileExists',path:'missing.txt',mandatory:false}
   ]});
   assert.equal(result.verifiedStatus,'VERIFIED');
 });
 
-test('git branch criterion passes on expected branch', () => {
+test('git branch criterion passes on expected branch', async () => {
   const dir=initRepo();
-  const result=verifyMission({id:'g1',repository:dir,criteria:[{id:'branch',type:'gitBranch',branch:'main'}]});
+  const result=await verifyMission({id:'g1',repository:dir,criteria:[{id:'branch',type:'gitBranch',branch:'main'}]});
   assert.equal(result.verifiedStatus,'VERIFIED');
 });
 
-test('git clean criterion fails with uncommitted changes', () => {
+test('git clean criterion fails with uncommitted changes', async () => {
   const dir=initRepo();
   fs.writeFileSync(path.join(dir,'a.txt'),'changed');
-  const result=verifyMission({id:'g2',repository:dir,criteria:[{id:'clean',type:'gitClean',clean:true}]});
+  const result=await verifyMission({id:'g2',repository:dir,criteria:[{id:'clean',type:'gitClean',clean:true}]});
   assert.equal(result.verifiedStatus,'FAILED');
 });
 
-test('changed file criterion detects committed change', () => {
+test('changed file criterion detects committed change', async () => {
   const dir=initRepo();
   fs.writeFileSync(path.join(dir,'b.txt'),'two');
   spawnSync('git',['-C',dir,'add','.']);
   spawnSync('git',['-C',dir,'commit','-m','second'],{encoding:'utf8'});
-  const result=verifyMission({id:'g3',repository:dir,criteria:[{id:'changed',type:'gitChangedFile',path:'b.txt'}]});
+  const result=await verifyMission({id:'g3',repository:dir,criteria:[{id:'changed',type:'gitChangedFile',path:'b.txt'}]});
   assert.equal(result.verifiedStatus,'VERIFIED');
 });

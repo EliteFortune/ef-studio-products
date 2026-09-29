@@ -6,7 +6,6 @@ import { verifyMission } from '../../../packages/verification/src/engine.js';
 import { systemHealth } from '../../../packages/diagnostics/src/health.js';
 
 const command = process.argv[2] ?? 'help';
-
 function loadJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 
 if (command === 'verify') {
@@ -14,7 +13,7 @@ if (command === 'verify') {
   const configFile = process.argv[4] ?? null;
   const mission = loadJson(file);
   const config = configFile ? loadJson(configFile) : {};
-  console.log(JSON.stringify(verifyMission(mission, { commandRegistry: config.commands ?? {} }), null, 2));
+  console.log(JSON.stringify(await verifyMission(mission, { commandRegistry: config.commands ?? {} }), null, 2));
 } else if (command === 'health') {
   const repo = process.argv[3] ?? process.cwd();
   console.log(JSON.stringify(systemHealth(repo), null, 2));
@@ -33,7 +32,7 @@ if (command === 'verify') {
       { id: 'deployment', type: 'fileExists', path: 'DEPLOYED_SHA' }
     ]
   };
-  const result = verifyMission(mission);
+  const result = await verifyMission(mission);
   console.log('Agent claim: COMPLETE');
   console.log(JSON.stringify(result, null, 2));
   if (result.verifiedStatus === 'VERIFIED') process.exitCode = 2;

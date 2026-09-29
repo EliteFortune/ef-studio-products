@@ -6,7 +6,9 @@ import {
   verifyGitBranch,
   verifyGitClean,
   verifyGitCommit,
-  verifyGitChangedFile
+  verifyGitChangedFile,
+  verifyGitHubPrMerged,
+  verifyGitHubStatusSuccess
 } from './verifiers.js';
 
 const handlers = {
@@ -16,7 +18,9 @@ const handlers = {
   gitBranch: verifyGitBranch,
   gitClean: verifyGitClean,
   gitCommit: verifyGitCommit,
-  gitChangedFile: verifyGitChangedFile
+  gitChangedFile: verifyGitChangedFile,
+  githubPrMerged: verifyGitHubPrMerged,
+  githubStatusSuccess: verifyGitHubStatusSuccess
 };
 
 export function deriveMissionVerdict(results) {
@@ -28,13 +32,13 @@ export function deriveMissionVerdict(results) {
   return MissionStatus.UNKNOWN;
 }
 
-export function verifyMission(mission, options = {}) {
+export async function verifyMission(mission, options = {}) {
   if (!Array.isArray(mission.criteria) || mission.criteria.length === 0) {
     return { missionId: mission.id, verifiedStatus: MissionStatus.UNKNOWN, criterionResults: [], createdAt: new Date().toISOString() };
   }
 
-  const context = { commandRegistry: options.commandRegistry ?? {} };
-  const results = mission.criteria.map(criterion => {
+  const context = { commandRegistry: options.commandRegistry ?? {}, githubClient: options.githubClient ?? null };
+  const results = await Promise.all(mission.criteria.map(async criterion => {
     const handler = handlers[criterion.type];
     if (!handler) {
       return {
@@ -48,7 +52,7 @@ export function verifyMission(mission, options = {}) {
       };
     }
     try {
-      return { mandatory: criterion.mandatory !== false, contradictions: [], missingEvidence: [], ...handler(mission.repository, criterion, context) };
+      return { mandatory: criterion.mandatory !== false, contradictions: [], missingEvidence: [], ...(await handler(mission.repository, criterion, context)) };
     } catch (error) {
       return {
         criterionId: criterion.id,
@@ -60,7 +64,7 @@ export function verifyMission(mission, options = {}) {
         explanation: error.message
       };
     }
-  });
+  }));
 
   return {
     missionId: mission.id,
