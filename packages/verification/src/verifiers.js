@@ -86,3 +86,26 @@ export function verifyGitChangedFile(repo, criterion) {
   const pass = files.includes(criterion.path);
   return { criterionId: criterion.id, status: pass ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('git_diff', repo, { base, files })], explanation: pass ? `Changed file found: ${criterion.path}` : `Changed file not found: ${criterion.path}` };
 }
+
+
+export async function verifyGitHubPrMerged(repo, criterion, context = {}) {
+  if (!context.githubClient) return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [], explanation: 'GitHub not connected' };
+  try {
+    const pr = await context.githubClient.getPullRequest(criterion.owner, criterion.repo, criterion.pullNumber);
+    const merged = pr.merged === true || pr.merged_at != null;
+    return { criterionId: criterion.id, status: merged ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('github_pr', `${criterion.owner}/${criterion.repo}#${criterion.pullNumber}`, { merged, state: pr.state, mergeCommitSha: pr.merge_commit_sha ?? null })], explanation: merged ? 'GitHub pull request is merged' : 'GitHub pull request is not merged' };
+  } catch (error) {
+    return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [], explanation: error.message };
+  }
+}
+
+export async function verifyGitHubStatusSuccess(repo, criterion, context = {}) {
+  if (!context.githubClient) return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [], explanation: 'GitHub not connected' };
+  try {
+    const status = await context.githubClient.getCombinedStatus(criterion.owner, criterion.repo, criterion.sha);
+    const ok = status.state === 'success';
+    return { criterionId: criterion.id, status: ok ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('github_status', `${criterion.owner}/${criterion.repo}@${criterion.sha}`, { state: status.state, totalCount: status.total_count ?? null })], explanation: ok ? 'GitHub status checks succeeded' : `GitHub status is ${status.state}` };
+  } catch (error) {
+    return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [], explanation: error.message };
+  }
+}
