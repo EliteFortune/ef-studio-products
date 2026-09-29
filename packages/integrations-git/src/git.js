@@ -1,14 +1,14 @@
 import { spawnSync } from 'node:child_process';
 
-function git(repo, args) {
+export function gitCommand(repo, args) {
   const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', timeout: 15000 });
   return { ok: r.status === 0, stdout: (r.stdout ?? '').trim(), stderr: (r.stderr ?? '').trim(), exitCode: r.status };
 }
 
 export function inspectGit(repo) {
-  const branch = git(repo, ['branch', '--show-current']);
-  const head = git(repo, ['rev-parse', 'HEAD']);
-  const status = git(repo, ['status', '--porcelain']);
+  const branch = gitCommand(repo, ['branch', '--show-current']);
+  const head = gitCommand(repo, ['rev-parse', 'HEAD']);
+  const status = gitCommand(repo, ['status', '--porcelain']);
   return {
     available: branch.ok && head.ok,
     branch: branch.stdout || null,

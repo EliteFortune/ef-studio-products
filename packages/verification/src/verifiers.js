@@ -2,17 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { CriterionStatus } from '../../core/src/contracts.js';
+import { inspectGit, gitCommand } from '../../integrations-git/src/git.js';
 
 const evidence = (type, source, details = {}) => ({ type, source, observedAt: new Date().toISOString(), details });
 
 export function verifyFileExists(repo, criterion) {
   const target = path.resolve(repo, criterion.path);
   const exists = fs.existsSync(target);
+  const expected = criterion.exists !== false;
+  const pass = exists === expected;
   return {
     criterionId: criterion.id,
-    status: exists ? CriterionStatus.PASS : CriterionStatus.FAIL,
-    evidence: [evidence('file_assertion', target, { exists })],
-    explanation: exists ? `File exists: ${criterion.path}` : `Required file missing: ${criterion.path}`
+    status: pass ? CriterionStatus.PASS : CriterionStatus.FAIL,
+    evidence: [evidence('file_assertion', target, { exists, expected })],
+    explanation: pass ? `File assertion passed: ${criterion.path}` : `File assertion failed: ${criterion.path}`
   };
 }
 
@@ -36,6 +39,10 @@ export function verifyCommand(repo, criterion) {
   const [cmd, ...args] = criterion.command;
   const started = Date.now();
   const result = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', timeout: criterion.timeoutMs ?? 120000, maxBuffer: 1024 * 1024 });
+  const timedOut = result.error?.code === 'ETIMEDOUT';
+  if (timedOut) {
+    return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [evidence('command_result', cmd, { timedOut: true, durationMs: Date.now() - started })], explanation: `Command timed out: ${cmd}` };
+  }
   const ok = result.status === 0;
   return {
     criterionId: criterion.id,
@@ -43,4 +50,34 @@ export function verifyCommand(repo, criterion) {
     evidence: [evidence('command_result', cmd, { args, exitCode: result.status, durationMs: Date.now() - started, stdout: (result.stdout ?? '').slice(-4000), stderr: (result.stderr ?? '').slice(-4000) })],
     explanation: ok ? `Command passed: ${cmd}` : `Command failed: ${cmd}`
   };
+}
+
+export function verifyGitBranch(repo, criterion) {
+  const state = inspectGit(repo);
+  if (!state.available) return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [evidence('git_state', repo, state)], explanation: state.error || 'Git unavailable' };
+  const pass = state.branch === criterion.branch;
+  return { criterionId: criterion.id, status: pass ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('git_branch', repo, { actual: state.branch, expected: criterion.branch })], explanation: pass ? 'Git branch matches' : `Expected branch ${criterion.branch}, found ${state.branch}` };
+}
+
+export function verifyGitClean(repo, criterion) {
+  const state = inspectGit(repo);
+  if (!state.available || state.dirty === null) return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [evidence('git_state', repo, state)], explanation: state.error || 'Git state unavailable' };
+  const expectedClean = criterion.clean !== false;
+  const actualClean = !state.dirty;
+  const pass = actualClean === expectedClean;
+  return { criterionId: criterion.id, status: pass ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('git_clean', repo, { actualClean, expectedClean })], explanation: pass ? 'Working tree state matches expectation' : 'Working tree state does not match expectation' };
+}
+
+export function verifyGitCommit(repo, criterion) {
+  const r = gitCommand(repo, ['cat-file', '-e', `${criterion.commit}^{commit}`]);
+  return { criterionId: criterion.id, status: r.ok ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('git_commit', repo, { commit: criterion.commit, exists: r.ok })], explanation: r.ok ? `Commit exists: ${criterion.commit}` : `Commit missing: ${criterion.commit}` };
+}
+
+export function verifyGitChangedFile(repo, criterion) {
+  const base = criterion.base ?? 'HEAD~1';
+  const r = gitCommand(repo, ['diff', '--name-only', base, 'HEAD']);
+  if (!r.ok) return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [evidence('git_diff', repo, { base, error: r.stderr })], explanation: 'Unable to inspect changed files' };
+  const files = r.stdout.split(/\r?\n/).filter(Boolean);
+  const pass = files.includes(criterion.path);
+  return { criterionId: criterion.id, status: pass ? CriterionStatus.PASS : CriterionStatus.FAIL, evidence: [evidence('git_diff', repo, { base, files })], explanation: pass ? `Changed file found: ${criterion.path}` : `Changed file not found: ${criterion.path}` };
 }
