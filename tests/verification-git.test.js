@@ -19,8 +19,9 @@ function initRepo() {
 
 test('optional failed criterion does not fail mission', () => {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ef-opt-'));
+  fs.writeFileSync(path.join(dir,'required.txt'),'ok');
   const result=verifyMission({id:'opt',repository:dir,criteria:[
-    {id:'required',type:'command',command:[process.execPath,'-e','process.exit(0)']},
+    {id:'required',type:'fileExists',path:'required.txt'},
     {id:'optional',type:'fileExists',path:'missing.txt',mandatory:false}
   ]});
   assert.equal(result.verifiedStatus,'VERIFIED');

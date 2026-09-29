@@ -34,21 +34,26 @@ export function verifyTextContains(repo, criterion) {
   };
 }
 
-export function verifyCommand(repo, criterion) {
-  if (!Array.isArray(criterion.command) || criterion.command.length === 0) throw new Error('command criterion requires command array');
-  const [cmd, ...args] = criterion.command;
+export function verifyCommand(repo, criterion, context = {}) {
+  if (Array.isArray(criterion.command)) throw new Error('raw command arrays are not allowed; use commandId from trusted configuration');
+  if (!criterion.commandId) throw new Error('command criterion requires commandId');
+  const spec = context.commandRegistry?.[criterion.commandId];
+  if (!spec || !Array.isArray(spec.command) || spec.command.length === 0) throw new Error(`trusted command not configured: ${criterion.commandId}`);
+
+  const [cmd, ...args] = spec.command;
+  const timeoutMs = Math.min(Number(spec.timeoutMs ?? 120000), 300000);
   const started = Date.now();
-  const result = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', timeout: criterion.timeoutMs ?? 120000, maxBuffer: 1024 * 1024 });
+  const result = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 1024 * 1024 });
   const timedOut = result.error?.code === 'ETIMEDOUT';
   if (timedOut) {
-    return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [evidence('command_result', cmd, { timedOut: true, durationMs: Date.now() - started })], explanation: `Command timed out: ${cmd}` };
+    return { criterionId: criterion.id, status: CriterionStatus.UNKNOWN, evidence: [evidence('command_result', criterion.commandId, { timedOut: true, durationMs: Date.now() - started })], explanation: `Trusted command timed out: ${criterion.commandId}` };
   }
   const ok = result.status === 0;
   return {
     criterionId: criterion.id,
     status: ok ? CriterionStatus.PASS : CriterionStatus.FAIL,
-    evidence: [evidence('command_result', cmd, { args, exitCode: result.status, durationMs: Date.now() - started, stdout: (result.stdout ?? '').slice(-4000), stderr: (result.stderr ?? '').slice(-4000) })],
-    explanation: ok ? `Command passed: ${cmd}` : `Command failed: ${cmd}`
+    evidence: [evidence('command_result', criterion.commandId, { exitCode: result.status, durationMs: Date.now() - started, stdout: (result.stdout ?? '').slice(-4000), stderr: (result.stderr ?? '').slice(-4000) })],
+    explanation: ok ? `Trusted command passed: ${criterion.commandId}` : `Trusted command failed: ${criterion.commandId}`
   };
 }
 

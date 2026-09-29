@@ -7,10 +7,14 @@ import { systemHealth } from '../../../packages/diagnostics/src/health.js';
 
 const command = process.argv[2] ?? 'help';
 
+function loadJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+
 if (command === 'verify') {
   const file = process.argv[3] ?? 'mission.json';
-  const mission = JSON.parse(fs.readFileSync(file, 'utf8'));
-  console.log(JSON.stringify(verifyMission(mission), null, 2));
+  const configFile = process.argv[4] ?? null;
+  const mission = loadJson(file);
+  const config = configFile ? loadJson(configFile) : {};
+  console.log(JSON.stringify(verifyMission(mission, { commandRegistry: config.commands ?? {} }), null, 2));
 } else if (command === 'health') {
   const repo = process.argv[3] ?? process.cwd();
   console.log(JSON.stringify(systemHealth(repo), null, 2));
@@ -22,6 +26,7 @@ if (command === 'verify') {
     title: 'False completion demo',
     objective: 'Implement and deploy feature',
     repository: dir,
+    claimedStatus: 'COMPLETE',
     criteria: [
       { id: 'code', type: 'fileExists', path: 'feature.txt' },
       { id: 'implementation', type: 'textContains', path: 'feature.txt', text: 'implemented' },
@@ -35,6 +40,6 @@ if (command === 'verify') {
 } else {
   console.log('EF Agent Reliability CLI');
   console.log('  demo');
-  console.log('  verify <mission.json>');
+  console.log('  verify <mission.json> [trusted-config.json]');
   console.log('  health [repo-path]');
 }

@@ -17,8 +17,9 @@ test('all mandatory criteria pass -> VERIFIED', () => {
 test('agent false completion is detected -> FAILED', () => {
   const r = repo();
   fs.writeFileSync(path.join(r, 'code.txt'), 'implemented');
-  const result = verifyMission({ id:'m2', repository:r, criteria:[{id:'code',type:'fileExists',path:'code.txt'},{id:'deploy',type:'fileExists',path:'DEPLOYED_SHA'}] });
+  const result = verifyMission({ id:'m2', repository:r, claimedStatus:'COMPLETE', criteria:[{id:'code',type:'fileExists',path:'code.txt'},{id:'deploy',type:'fileExists',path:'DEPLOYED_SHA'}] });
   assert.equal(result.verifiedStatus, 'FAILED');
+  assert.equal(result.claimedStatus, 'COMPLETE');
 });
 
 test('unsupported criterion cannot silently pass', () => {
@@ -27,8 +28,18 @@ test('unsupported criterion cannot silently pass', () => {
   assert.equal(result.verifiedStatus, 'INCOMPLETE');
 });
 
-test('trusted command success produces VERIFIED', () => {
+test('trusted configured command success produces VERIFIED', () => {
   const r = repo();
-  const result = verifyMission({ id:'m4', repository:r, criteria:[{id:'cmd',type:'command',command:[process.execPath,'-e','process.exit(0)']}] });
+  const result = verifyMission(
+    { id:'m4', repository:r, criteria:[{id:'cmd',type:'command',commandId:'unit-test'}] },
+    { commandRegistry:{ 'unit-test':{ command:[process.execPath,'-e','process.exit(0)'] } } }
+  );
   assert.equal(result.verifiedStatus, 'VERIFIED');
+});
+
+test('raw command supplied by mission cannot execute', () => {
+  const r = repo();
+  const result = verifyMission({ id:'m5', repository:r, criteria:[{id:'cmd',type:'command',command:[process.execPath,'-e','process.exit(0)']}] });
+  assert.equal(result.verifiedStatus, 'INCOMPLETE');
+  assert.match(result.criterionResults[0].explanation, /raw command arrays are not allowed/);
 });

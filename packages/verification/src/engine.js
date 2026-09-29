@@ -28,11 +28,12 @@ export function deriveMissionVerdict(results) {
   return MissionStatus.UNKNOWN;
 }
 
-export function verifyMission(mission) {
+export function verifyMission(mission, options = {}) {
   if (!Array.isArray(mission.criteria) || mission.criteria.length === 0) {
     return { missionId: mission.id, verifiedStatus: MissionStatus.UNKNOWN, criterionResults: [], createdAt: new Date().toISOString() };
   }
 
+  const context = { commandRegistry: options.commandRegistry ?? {} };
   const results = mission.criteria.map(criterion => {
     const handler = handlers[criterion.type];
     if (!handler) {
@@ -47,7 +48,7 @@ export function verifyMission(mission) {
       };
     }
     try {
-      return { mandatory: criterion.mandatory !== false, contradictions: [], missingEvidence: [], ...handler(mission.repository, criterion) };
+      return { mandatory: criterion.mandatory !== false, contradictions: [], missingEvidence: [], ...handler(mission.repository, criterion, context) };
     } catch (error) {
       return {
         criterionId: criterion.id,
