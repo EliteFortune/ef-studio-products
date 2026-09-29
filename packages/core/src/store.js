@@ -4,11 +4,12 @@ import path from 'node:path';
 export class LocalStore {
   constructor(filePath) {
     this.filePath = path.resolve(filePath);
+    this.backupPath = `${this.filePath}.bak`;
   }
 
   init() {
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    if (!fs.existsSync(this.filePath)) this.#write({ version: 1, repositories: {}, missions: {}, runs: {}, evidence: {}, verdicts: {} });
+    if (!fs.existsSync(this.filePath)) this.#write({ version: 1, repositories: {}, missions: {}, runs: {}, evidence: {}, verdicts: {} }, false);
     return this;
   }
 
@@ -41,12 +42,41 @@ export class LocalStore {
 
   putVerdict(verdict) {
     const data = this.read();
-    data.verdicts[verdict.missionId] = verdict;
+    const key = verdict.runId ?? verdict.id ?? `${verdict.missionId}:${verdict.createdAt ?? new Date().toISOString()}`;
+    data.verdicts[key] = verdict;
     this.#write(data);
     return verdict;
   }
 
-  #write(data) {
+  listRuns() {
+    const data = this.read();
+    return Object.values(data.runs).sort((a,b) => String(b.createdAt ?? b.updatedAt ?? '').localeCompare(String(a.createdAt ?? a.updatedAt ?? '')));
+  }
+
+  listRunHistory() {
+    const data = this.read();
+    const verdictsByRun = Object.values(data.verdicts).reduce((acc,v) => {
+      if (v.runId) acc[v.runId] = v;
+      return acc;
+    }, {});
+    return Object.values(data.runs)
+      .map(run => ({ ...run, mission: data.missions[run.missionId] ?? null, verdict: verdictsByRun[run.id] ?? null }))
+      .sort((a,b) => String(b.createdAt ?? b.updatedAt ?? '').localeCompare(String(a.createdAt ?? a.updatedAt ?? '')));
+  }
+
+  restoreLastGood() {
+    if (!fs.existsSync(this.backupPath)) return { ok:false, code:'EF-STORE-404', message:'No last-known-good state backup is available' };
+    fs.copyFileSync(this.backupPath, this.filePath);
+    try {
+      this.read();
+      return { ok:true, code:'EF-STORE-000', message:'Last-known-good state restored' };
+    } catch (error) {
+      return { ok:false, code:'EF-STORE-500', message:error.message };
+    }
+  }
+
+  #write(data, backup = true) {
+    if (backup && fs.existsSync(this.filePath)) fs.copyFileSync(this.filePath, this.backupPath);
     const temp = `${this.filePath}.tmp`;
     fs.writeFileSync(temp, JSON.stringify(data, null, 2));
     fs.renameSync(temp, this.filePath);
