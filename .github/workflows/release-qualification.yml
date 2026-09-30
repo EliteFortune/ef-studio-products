@@ -1,0 +1,29 @@
+name: Release Qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/licensing/**'
+      - 'packages/updater/**'
+      - 'scripts/release-check.mjs'
+      - 'scripts/generate-sbom.mjs'
+      - '.github/workflows/release-qualification.yml'
+
+jobs:
+  qualify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run release qualification
+        shell: pwsh
+        run: npm run release:check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ef-agent-reliability-release-evidence
+          path: |
+            dist/sbom.cdx.json
+            docs/commercial/RELEASE-CHECKLIST.md
