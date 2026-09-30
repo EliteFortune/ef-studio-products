@@ -10,6 +10,7 @@ import { LocalStore } from '../../../packages/core/src/store.js';
 import { evaluateEntitlement } from '../../../packages/licensing/src/entitlement.js';
 import { activateLicense } from '../../../packages/licensing/src/client.js';
 import { EntitlementStore } from '../../../packages/licensing/src/store.js';
+import { getOrCreateInstallId } from '../../../packages/core/src/install-id.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
@@ -34,6 +35,7 @@ export async function startServer(options={}) {
   const dataDir=path.resolve(options.dataDir ?? process.env.EF_DATA_DIR ?? path.join(process.cwd(), '.ef-data'));
   const store=new LocalStore(path.join(dataDir,'state.json')).init();
   const entitlementStore=new EntitlementStore(path.join(dataDir,'entitlement.json'));
+  const installId=getOrCreateInstallId(dataDir);
   function healthSnapshot(){const health=systemHealth(repo);health.store={status:'HEALTHY',detail:store.filePath};health.github=process.env.GITHUB_TOKEN?{status:'HEALTHY',detail:'GitHub credential configured locally'}:{status:'NOT_CONFIGURED',detail:'GitHub is optional; local verification remains available'};return {health,issues:classifyHealth(health),repository:repo};}
   function runSummary(){const runs=store.listRunHistory(),counts={total:runs.length,verified:0,attention:0,failed:0,unknown:0};for(const r of runs){const s=r.verdict?.verifiedStatus??r.verifiedStatus??'UNKNOWN';if(s==='VERIFIED')counts.verified++;else if(s==='FAILED')counts.failed++;else if(s==='INCOMPLETE')counts.attention++;else counts.unknown++;}return {runs,counts};}
   const server = http.createServer(async (req, res) => {
@@ -42,7 +44,7 @@ export async function startServer(options={}) {
     if (url.pathname === '/api/health' && req.method === 'GET') return send(res, 200, JSON.stringify(healthSnapshot(), null, 2));
     if (url.pathname === '/api/runs' && req.method === 'GET') return send(res, 200, JSON.stringify(runSummary(), null, 2));
     if (url.pathname === '/api/license' && req.method === 'GET') { const entitlement=entitlementStore.load(); return send(res,200,JSON.stringify({entitlement,status:evaluateEntitlement(entitlement)})); }
-    if (url.pathname === '/api/license/activate' && req.method === 'POST') { const body=await readBody(req); const result=await activateLicense({licenseKey:body.licenseKey,endpoint:process.env.EF_LICENSE_API_URL}); if(result.ok)entitlementStore.save(result.entitlement); return send(res,result.ok?200:400,JSON.stringify(result)); }
+    if (url.pathname === '/api/license/activate' && req.method === 'POST') { const body=await readBody(req); const result=await activateLicense({licenseKey:body.licenseKey,deviceId:installId,endpoint:process.env.EF_LICENSE_API_URL || undefined}); if(result.ok)entitlementStore.save(result.entitlement); return send(res,result.ok?200:400,JSON.stringify(result)); }
     if (url.pathname === '/api/support-bundle' && req.method === 'GET') {
       const snapshot = healthSnapshot();
       const bundle = createSupportBundle({ health: snapshot.health, appVersion: '0.1.0', os: process.platform, recentErrors: snapshot.issues });
