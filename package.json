@@ -4,14 +4,48 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js",
+    "test": "node scripts/run-tests.mjs",
     "demo": "node apps/cli/src/index.js demo",
     "verify": "node apps/cli/src/index.js verify",
     "console": "node apps/desktop/src/server.js",
     "sbom": "node scripts/generate-sbom.mjs",
-    "release:check": "node scripts/release-check.mjs"
+    "release:check": "node scripts/release-check.mjs",
+    "desktop": "electron .",
+    "package:win": "electron-builder --win nsis"
   },
   "engines": {
     "node": ">=20"
+  },
+  "main": "apps/desktop/src/electron-main.cjs",
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "info.elitefortune.agentreliability",
+    "productName": "EliteFortune Agent Reliability",
+    "directories": {
+      "output": "dist/windows"
+    },
+    "files": [
+      "apps/desktop/**/*",
+      "packages/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "apps/desktop/src/electron-main.cjs"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "EliteFortune-Agent-Reliability-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
