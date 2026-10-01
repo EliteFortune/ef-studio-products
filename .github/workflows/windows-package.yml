@@ -47,3 +47,4 @@ jobs:
             dist/windows/*.exe
             dist/windows/*.yml
             dist/windows/*.blockmap
+          retention-days: 14
