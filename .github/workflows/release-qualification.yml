@@ -32,3 +32,4 @@ jobs:
           path: |
             dist/sbom.cdx.json
             docs/commercial/RELEASE-CHECKLIST.md
+          retention-days: 30
